@@ -73,6 +73,16 @@ logs:
 shell: # Open a shell on a started container
 	docker exec -it ${REGISTRY_CONTAINER} /bin/bash
 
+.PHONY: test
+test:
+	docker pull hello-world:latest
+	docker tag hello-world:latest ${REGISTRY_HOSTNAME}/my-hello-world:latest
+	docker push ${REGISTRY_HOSTNAME}/my-hello-world:latest
+	docker image remove hello-world:latest ${REGISTRY_HOSTNAME}/my-hello-world:latest
+	docker pull ${REGISTRY_HOSTNAME}/my-hello-world:latest
+	docker run --rm ${REGISTRY_HOSTNAME}/my-hello-world:latest
+	docker image remove ${REGISTRY_HOSTNAME}/my-hello-world:latest
+
 .PHONY: url
 url:
 	@echo ${REGISTRY_EXTERNAL_URL}
