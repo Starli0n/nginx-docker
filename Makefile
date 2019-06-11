@@ -19,7 +19,8 @@ env: # Create .env and tweak it before init
 
 .PHONY: init
 init:
-	mkdir -p registry
+	mkdir -p registry/{auth,data}
+	docker run --entrypoint htpasswd registry:${TAG} -Bbn ${REGISTRY_USER} ${REGISTRY_PASS} > registry/auth/htpasswd
 
 .PHONY: erase
 erase:
@@ -71,17 +72,53 @@ logs:
 
 .PHONY: shell
 shell: # Open a shell on a started container
-	docker exec -it ${REGISTRY_CONTAINER} /bin/bash
+	docker exec -it ${REGISTRY_CONTAINER} /bin/sh
+
+.PHONY: login
+login:
+	@docker login -u ${REGISTRY_USER} -p ${REGISTRY_PASS} ${REGISTRY_HOSTNAME} 2> /dev/null
+	@echo ${REGISTRY_HOSTNAME}
+
+.PHONY: logout
+logout:
+	docker logout ${REGISTRY_HOSTNAME}
+
+.PHONY: catalog
+catalog:
+	@curl -u ${REGISTRY_USER}:${REGISTRY_PASS} ${REGISTRY_EXTERNAL_URL}/v2/_catalog
+
+.PHONY: list
+list:
+	@curl -u ${REGISTRY_USER}:${REGISTRY_PASS} ${REGISTRY_EXTERNAL_URL}/v2/my-hello-world/tags/list
+
+.PHONY: garbage-collect
+garbage-collect:
+	docker exec registry bin/registry garbage-collect /etc/docker/registry/config.yml
+
+.PHONY: test-login
+test-login: login logout
 
 .PHONY: test
-test:
+test: login test-push test-remove stop test-delete start garbage-collect logout
+
+.PHONY: test-push
+test-push:
 	docker pull hello-world:latest
 	docker tag hello-world:latest ${REGISTRY_HOSTNAME}/my-hello-world:latest
 	docker push ${REGISTRY_HOSTNAME}/my-hello-world:latest
 	docker image remove hello-world:latest ${REGISTRY_HOSTNAME}/my-hello-world:latest
 	docker pull ${REGISTRY_HOSTNAME}/my-hello-world:latest
+
+.PHONY: test-remove
+test-remove:
 	docker run --rm ${REGISTRY_HOSTNAME}/my-hello-world:latest
 	docker image remove ${REGISTRY_HOSTNAME}/my-hello-world:latest
+
+.PHONY: test-delete
+test-delete:
+	find . | grep `ls ./registry/data/docker/registry/v2/repositories/my-hello-world/_manifests/tags/latest/index/sha256` | xargs rm -rf $1
+	ls -1 ./registry/data/docker/registry/v2/repositories/my-hello-world/_layers/sha256 | xargs -L1 find ./registry/data/docker/registry/v2 -name $1 | xargs rm -rf $1
+	rm -rf ./registry/data/docker/registry/v2/repositories/my-hello-world
 
 .PHONY: url
 url:

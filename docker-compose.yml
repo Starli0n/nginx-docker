@@ -7,11 +7,16 @@ services:
     image: registry:${TAG}
     hostname: ${NGINX_HOSTNAME}
     environment:
+      REGISTRY_AUTH: 'htpasswd'
+      REGISTRY_AUTH_HTPASSWD_REALM: 'Registry Realm'
+      REGISTRY_AUTH_HTPASSWD_PATH: '/auth/htpasswd'
+      REGISTRY_STORAGE_DELETE_ENABLED: 'True'
       VIRTUAL_HOST: ${REGISTRY_HOSTNAME}
       LETSENCRYPT_HOST: ${REGISTRY_HOSTNAME}
       LETSENCRYPT_EMAIL: ${REGISTRY_CONTAINER}@no-reply.com
     volumes:
-      - ./registry:/var/lib/registry
+      - ./registry/auth:/auth
+      - ./registry/data:/var/lib/registry
     restart: always
 
 networks:
